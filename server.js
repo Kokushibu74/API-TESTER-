@@ -47,6 +47,36 @@ http.createServer(async(req,res)=>{
       return send(res,200,{ok:true,provider:'OpenRouter',count:models.length,models});
     }catch(e){return send(res,502,{error:e.message});}
   }
+  if(req.method==='POST'&&req.url==='/api/auto-select'){
+    try{
+      const input=JSON.parse(await read(req));
+      const key=String(input.apiKey||'').trim();
+      if(!key)return send(res,400,{error:'Paste your OpenRouter API key first.'});
+      if(key.length>1000||/[\\r\\n]/.test(key))return send(res,400,{error:'API key format is invalid.'});
+      const headers={Authorization:'Bearer '+key,'Accept':'application/json'};
+      const auth=await providerFetch(API+'/models',{headers},20000);
+      if(!auth.response.ok)return send(res,200,{ok:false,keyValid:false,status:auth.response.status,error:auth.data?.error?.message||'The provider rejected this key.'});
+      const catalog=Array.isArray(auth.data?.data)?auth.data.data:[];
+      const free=catalog.filter(m=>m.id&&((m.id.toLowerCase().includes(':free'))||(Number(m.pricing?.prompt)===0&&Number(m.pricing?.completion)===0)))
+        .sort((a,b)=>Number(b.context_length||0)-Number(a.context_length||0)).slice(0,5);
+      if(!free.length)return send(res,200,{ok:false,keyValid:true,error:'No models clearly marked free were found. Choose a model manually; paid models will not be tested automatically.'});
+      const attempts=[];
+      for(const model of free){
+        try{
+          const result=await providerFetch(API+'/chat/completions',{
+            method:'POST',headers:{...headers,'Content-Type':'application/json'},
+            body:JSON.stringify({model:model.id,messages:[{role:'user',content:'Reply with exactly: API_TEST_OK'}],max_tokens:8,stream:false})
+          },15000);
+          const answer=result.data?.choices?.[0]?.message?.content;
+          attempts.push({model:model.id,status:result.response.status,ok:result.response.ok});
+          if(result.response.ok&&typeof answer==='string'&&answer.trim()){
+            return send(res,200,{ok:true,keyValid:true,model:model.id,modelName:model.name||model.id,modelListed:true,attempts,elapsedMs:result.elapsedMs,answer,quota:result.quota,providerRequestId:result.headers['x-request-id']||result.headers['request-id']||null});
+          }
+        }catch(e){attempts.push({model:model.id,error:e.message});}
+      }
+      return send(res,200,{ok:false,keyValid:true,attempts,error:'Could not get a successful response from the first 5 free models. Try manual model selection or check your account limits.'});
+    }catch(e){return send(res,400,{error:e.message||'Auto-selection failed.'});}
+  }
   if(req.method==='POST'&&req.url==='/api/check'){
     try{
       const input=JSON.parse(await read(req));
