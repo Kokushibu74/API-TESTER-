@@ -1,73 +1,70 @@
-# API Tester — Termux AI API Workbench
+# AI Model Checker — Termux
 
-A local web dashboard to test AI API endpoints from Android Termux. Uses Node.js built-ins only: no npm dependencies, no GitHub app, no external dashboard.
+A simple mobile dashboard: **select an AI model, paste your API key, tap Check, and read the report.**
 
-## Features
-- GET, POST, PUT, PATCH, DELETE and HEAD requests to HTTP/HTTPS APIs.
-- Bearer API key and custom JSON headers.
-- Request bodies for chat/completion and other API formats.
-- HTTP status, latency, response body and headers.
-- Detect quota/rate-limit headers when a provider returns them.
-- List model IDs from OpenAI-compatible `/models` endpoints.
-- Mobile-friendly interface; keys are not written to disk.
+## Current provider support
+This build uses **OpenRouter** as the unified provider. OpenRouter exposes a catalogue of 1000+ model choices through one API, so the app can populate the model selector automatically. It does not automatically identify arbitrary API keys from unrelated providers. A Google AI Studio key, OpenAI key, Groq key, and OpenRouter key are not interchangeable.
 
-## 1000+ AI APIs
-There is no fixed provider-count limit: you can test 1000+ endpoints one by one if you have their URLs and credentials. This tool does not provide API keys, grant free access, or bypass quotas. Providers may have different authentication, endpoint paths, and payload formats. Model listing works best with OpenAI-compatible APIs.
+## What it checks
+- Loads the live OpenRouter model catalogue and lets you search/select a model.
+- Checks whether OpenRouter accepts the provided key.
+- Checks whether the selected model appears in the account-visible catalogue.
+- Sends a small real generation request to test model access.
+- Reports HTTP status, response time, model response/error, token usage, and request ID when available.
+- Shows quota/rate-limit headers only when the provider returns them.
+- Displays model context and price metadata when the catalogue supplies it.
+- Does not write the API key to a file or browser storage.
 
-## Install in Termux
+## Run on Android Termux
+Install Node.js and Git:
 ```bash
 pkg update
 pkg install nodejs git
+```
+Clone and start:
+```bash
 git clone https://github.com/Kokushibu74/API-TESTER-.git
 cd API-TESTER-
 npm start
 ```
-Open `http://127.0.0.1:8787` in your phone browser. Keep Termux open. Stop with Ctrl+C.
-
-## Test an API
-1. Paste the full endpoint URL (including `https://`).
-2. Choose the HTTP method.
-3. Add a Bearer key if the provider uses Bearer authentication.
-4. Put extra headers in JSON, e.g. `{"Accept":"application/json","Content-Type":"application/json"}`.
-5. For POST/PUT/PATCH, enter the provider's required body and press **Test API**.
-
-### Example OpenAI-compatible chat request
-Endpoint commonly resembles `https://api.example.com/v1/chat/completions`; use the actual endpoint from your provider.
-Method: POST. Put the API key in the key field. Example body (replace `your-model`):
-```json
-{
-  "model": "your-model",
-  "messages": [{"role":"user","content":"Reply with: API test successful"}],
-  "max_tokens": 30
-}
+Open in your phone browser:
+```text
+http://127.0.0.1:8787
 ```
-Some APIs use different request formats; follow their documentation.
+Keep Termux open while using it. Stop the server with Ctrl+C.
 
-## Model list
-In the model checker, enter a base URL such as `https://api.example.com/v1` or the full `/v1/models` endpoint. Add the key if required, then fetch models. IDs returned by the provider can be copied.
+## Use it
+1. Create or obtain an OpenRouter API key from the official OpenRouter account.
+2. Open the local dashboard and wait for the model catalogue to load.
+3. Search and select a model.
+4. Paste the OpenRouter key.
+5. Tap **Check key & test model**.
+6. Read the report:
+   - **PASS** means the key was accepted and the small generation test succeeded.
+   - **KEY VALID · MODEL FAILED** means the key was accepted but the selected model call failed; check the error, account credits, provider availability, model access, and limits.
+   - **FAILED** means the key was rejected or could not be verified.
 
-## Interpret results
-- **2xx:** server reports success.
-- **401/403:** key, permission, or auth method may be wrong.
-- **404:** endpoint path may be wrong.
-- **429:** often rate limit or quota.
-- **5xx:** provider-side error.
-- **Quota:** only available if returned by the API; the tool will not guess.
+The test sends a small prompt (“Reply with exactly: API_TEST_OK”) and may incur a small charge for paid models. Choose a model marked free in the provider's current catalogue if you want to avoid model usage charges; free availability can change. The tool itself is free and does not provide credits or keys.
+
+## Important limits
+- “1000+” means catalogue choices, not that every model is free or guaranteed to work.
+- Token counts, prices, and quotas are displayed only when the provider returns them.
+- Providers may hide remaining credits/quotas or report limits in a separate dashboard; this tool will not guess.
+- This version uses OpenRouter keys only. Supporting direct provider keys requires a provider selection or separate adapters, because keys and API endpoints are not universally interchangeable.
 
 ## Security
-- Server binds to `127.0.0.1`, intended for use on this phone.
-- Keys are not saved to files; they are sent to this local server then forwarded to the selected endpoint.
-- Only use keys with trusted endpoints. Do not expose this server publicly.
-- Common private IPv4/local hostnames are blocked, but this is a personal tool, not a hardened security gateway.
-- Respect API terms and limits.
+- The server binds to `127.0.0.1` for local phone use.
+- The key is sent to this local server and forwarded to OpenRouter for the check; it is not written to disk or browser storage.
+- Never paste an API key into a site you do not trust, and do not expose the local server publicly.
 
 ## Troubleshooting
-- `node: command not found`: run `pkg install nodejs`.
-- Dashboard won't open: ensure `npm start` is running and open `http://127.0.0.1:8787`.
-- 401/403: verify the key and required authentication header.
-- Unknown model-list format: use the request builder on the provider's documented model endpoint.
+- **Model catalogue fails:** check internet access and retry “Reload models”.
+- **401/403:** key may be invalid, disabled, or missing permissions.
+- **402/429:** account credit, provider limits, or rate limits may be involved.
+- **Model unavailable:** try another model or review the provider's availability.
+- **Dashboard won't open:** check that `npm start` is still running, then open `http://127.0.0.1:8787`.
 
-## Structure
+## Files
 ```text
 API-TESTER-/
 ├── server.js
