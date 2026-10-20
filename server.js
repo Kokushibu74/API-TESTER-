@@ -52,7 +52,7 @@ http.createServer(async(req,res)=>{
       const input=JSON.parse(await read(req));
       const key=String(input.apiKey||'').trim();
       if(!key)return send(res,400,{error:'Paste your OpenRouter API key first.'});
-      if(key.length>1000||/[\\r\\n]/.test(key))return send(res,400,{error:'API key format is invalid.'});
+      if(key.length>1000)return send(res,400,{error:'API key format is invalid.'});
       const headers={Authorization:'Bearer '+key,'Accept':'application/json'};
       const auth=await providerFetch(API+'/models',{headers},20000);
       if(!auth.response.ok)return send(res,200,{ok:false,keyValid:false,status:auth.response.status,error:auth.data?.error?.message||'The provider rejected this key.'});
@@ -83,7 +83,7 @@ http.createServer(async(req,res)=>{
       const key=String(input.apiKey||'').trim(),model=String(input.model||'').trim();
       if(!key)return send(res,400,{error:'Paste your OpenRouter API key first.'});
       if(!model)return send(res,400,{error:'Select a model first.'});
-      if(key.length>1000||/[\r\n]/.test(key))return send(res,400,{error:'API key format is invalid.'});
+      if(key.length>1000)return send(res,400,{error:'API key format is invalid.'});
       const headers={Authorization:'Bearer '+key,'Accept':'application/json'};
       const auth=await providerFetch(API+'/models',{headers},20000);
       if(!auth.response.ok){
