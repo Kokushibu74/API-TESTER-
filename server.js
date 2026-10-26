@@ -20,6 +20,21 @@ function quotaHeaders(headers){
   for(const [k,v] of headers.entries()) if(/rate.?limit|quota|usage|tokens.?remaining|retry-after|request.?remaining/i.test(k)) out[k]=v;
   return out;
 }
+
+// Limit expensive provider calls even when this local tool is accidentally exposed through a tunnel.
+const requestBuckets = new Map();
+function allowRequest(req, route, max = 10, windowMs = 60_000) {
+  const now = Date.now();
+  const key = (req.socket.remoteAddress || 'unknown') + ':' + route;
+  let bucket = requestBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+  bucket.count += 1;
+  requestBuckets.set(key, bucket);
+  if (requestBuckets.size > 2000) {
+    for (const [k, v] of requestBuckets) if (now >= v.resetAt) requestBuckets.delete(k);
+  }
+  return bucket.count <= max;
+}
 async function providerFetch(url,options={},timeoutMs=25000){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),Math.min(Math.max(Number(timeoutMs)||25000,1000),60000));
@@ -33,6 +48,11 @@ async function providerFetch(url,options={},timeoutMs=25000){
   finally{clearTimeout(timer);}
 }
 http.createServer(async(req,res)=>{
+  const pathname = new URL(req.url, 'http://127.0.0.1').pathname;
+  if (req.method === 'POST' && ['/api/check', '/api/auto-select'].includes(pathname) && !allowRequest(req, pathname, 10)) {
+    res.setHeader('retry-after', '60');
+    return send(res, 429, { error: 'Too many provider checks. Wait one minute before trying again.' });
+  }
   if(req.method==='GET'&&req.url==='/api/health')return send(res,200,{ok:true,app:'AI Model Checker',provider:'OpenRouter'});
   if(req.method==='GET'&&req.url==='/api/catalog'){
     try{
