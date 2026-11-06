@@ -138,9 +138,11 @@ http.createServer(async(req,res)=>{
   }
   if(req.method==='GET'){
     const pathname=new URL(req.url,'http://127.0.0.1').pathname;
-    const rel=pathname==='/'?'public/index.html':pathname.replace(/^\/+/, '');
-    const file=path.resolve(ROOT,rel);
-    if(!file.startsWith(ROOT+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile())return send(res,404,{error:'Not found'});
+    // Serve only the public UI directory; never expose .env, source, or local credential files.
+    const publicRoot=path.join(ROOT,'public');
+    const rel=pathname==='/'||pathname==='/public/index.html'?'index.html':pathname.replace(/^\/+/, '');
+    const file=path.resolve(publicRoot,rel);
+    if(!file.startsWith(publicRoot+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile())return send(res,404,{error:'Not found'});
     return send(res,200,fs.readFileSync(file),MIME[path.extname(file)]||'application/octet-stream');
   }
   return send(res,404,{error:'Not found'});
